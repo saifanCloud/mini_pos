@@ -4,6 +4,8 @@ import '../../auth/presentation/cubit/auth_cubit.dart';
 import '../../auth/presentation/cubit/auth_state.dart';
 import '../../auth/presentation/screens/login_screen.dart';
 import '../../category/presentation/screens/master_data_screen.dart';
+import 'cubit/cashier_cubit.dart';
+import 'screens/cashier_view.dart';
 
 /// Layar utama shell aplikasi dengan navigasi 4 tab:
 /// Kasir, Produk, Laporan, dan Pengaturan.
@@ -42,6 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               _currentIndex = index;
             });
+            if (index == 0) {
+              context.read<CashierCubit>().loadData();
+            }
           },
           destinations: const [
             NavigationDestination(
@@ -88,11 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody(int index) {
     switch (index) {
       case 0:
-        return _buildPlaceholder(
-          icon: Icons.point_of_sale,
-          title: 'Layar Kasir',
-          subtitle: 'Fitur kasir akan hadir di Tahap 10.',
-        );
+        return const CashierView();
       case 1:
         return const MasterDataScreen();
       case 2:

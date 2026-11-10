@@ -6,6 +6,8 @@ import '../../features/addon/presentation/cubit/addon_cubit.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
+import '../../features/cashier/presentation/cubit/cart_cubit.dart';
+import '../../features/cashier/presentation/cubit/cashier_cubit.dart';
 import '../../features/category/data/repositories/category_repository_impl.dart';
 import '../../features/category/domain/repositories/category_repository.dart';
 import '../../features/category/presentation/cubit/category_cubit.dart';
@@ -54,6 +56,15 @@ Future<void> configureDependencies() async {
     () => ProductCubit(sl<ProductRepository>()),
   );
 
-  // TODO(tahap-10): daftarkan CartCubit
-  // dst per fitur
+  // Cashier & Cart
+  sl.registerFactory<CashierCubit>(
+    () => CashierCubit(
+      sl<ProductRepository>(),
+      sl<CategoryRepository>(),
+      sl<AddonRepository>(),
+    ),
+  );
+  sl.registerLazySingleton<CartCubit>(
+    () => CartCubit(),
+  );
 }

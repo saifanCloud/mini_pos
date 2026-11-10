@@ -4,6 +4,8 @@ import 'core/di/injection.dart';
 import 'features/addon/presentation/cubit/addon_cubit.dart';
 import 'features/auth/presentation/cubit/auth_cubit.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
+import 'features/cashier/presentation/cubit/cart_cubit.dart';
+import 'features/cashier/presentation/cubit/cashier_cubit.dart';
 import 'features/category/presentation/cubit/category_cubit.dart';
 import 'features/product/presentation/cubit/product_cubit.dart';
 
@@ -26,6 +28,12 @@ class App extends StatelessWidget {
         ),
         BlocProvider<ProductCubit>(
           create: (_) => sl<ProductCubit>(),
+        ),
+        BlocProvider<CashierCubit>(
+          create: (_) => sl<CashierCubit>(),
+        ),
+        BlocProvider<CartCubit>(
+          create: (_) => sl<CartCubit>(),
         ),
       ],
       child: MaterialApp(

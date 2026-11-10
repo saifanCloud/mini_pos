@@ -21,9 +21,11 @@ class CheckoutTotals extends Equatable {
     required this.subtotal,
     this.discountType,
     this.discountValue = 0,
-    required this.discountAmount,
+    this.discountAmount = 0,
     required this.total,
   });
+
+  bool get hasDiscount => discountAmount > 0;
 
   @override
   List<Object?> get props => [

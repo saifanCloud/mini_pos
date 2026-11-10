@@ -6,6 +6,7 @@ import 'features/auth/presentation/cubit/auth_cubit.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
 import 'features/cashier/presentation/cubit/cart_cubit.dart';
 import 'features/cashier/presentation/cubit/cashier_cubit.dart';
+import 'features/cashier/presentation/cubit/checkout_cubit.dart';
 import 'features/category/presentation/cubit/category_cubit.dart';
 import 'features/product/presentation/cubit/product_cubit.dart';
 
@@ -34,6 +35,9 @@ class App extends StatelessWidget {
         ),
         BlocProvider<CartCubit>(
           create: (_) => sl<CartCubit>(),
+        ),
+        BlocProvider<CheckoutCubit>(
+          create: (_) => sl<CheckoutCubit>(),
         ),
       ],
       child: MaterialApp(

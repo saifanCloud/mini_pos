@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
+import '../../../addon/presentation/cubit/addon_cubit.dart';
+import '../../../addon/presentation/screens/addon_tab_view.dart';
 import '../cubit/category_cubit.dart';
 import 'category_tab_view.dart';
 
@@ -10,8 +12,15 @@ class MasterDataScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<CategoryCubit>(
-      create: (_) => sl<CategoryCubit>(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<CategoryCubit>(
+          create: (_) => sl<CategoryCubit>(),
+        ),
+        BlocProvider<AddonCubit>(
+          create: (_) => sl<AddonCubit>(),
+        ),
+      ],
       child: DefaultTabController(
         length: 3,
         child: Column(
@@ -33,12 +42,7 @@ class MasterDataScreen extends StatelessWidget {
                     subtitle: 'Fitur produk dan foto offline akan hadir di Tahap 8.',
                     icon: Icons.inventory_2_outlined,
                   ),
-                  _buildPlaceholder(
-                    context,
-                    title: 'Kelola Add-on / Topping',
-                    subtitle: 'Fitur add-on dan stok tersendiri akan hadir di Tahap 7.',
-                    icon: Icons.extension_outlined,
-                  ),
+                  const AddonTabView(),
                 ],
               ),
             ),
@@ -87,4 +91,3 @@ class MasterDataScreen extends StatelessWidget {
     );
   }
 }
-

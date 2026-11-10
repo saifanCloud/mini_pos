@@ -17,6 +17,12 @@ import '../../features/category/presentation/cubit/category_cubit.dart';
 import '../../features/product/data/repositories/product_repository_impl.dart';
 import '../../features/product/domain/repositories/product_repository.dart';
 import '../../features/product/presentation/cubit/product_cubit.dart';
+import '../../features/receipt/data/repositories/receipt_repository_impl.dart';
+import '../../features/receipt/domain/repositories/receipt_repository.dart';
+import '../../features/receipt/presentation/cubit/receipt_cubit.dart';
+import '../../features/settings/data/repositories/settings_repository_impl.dart';
+import '../../features/settings/domain/repositories/settings_repository.dart';
+import '../../features/settings/presentation/cubit/settings_cubit.dart';
 
 /// Service locator global. Gunakan `sl<T>()` untuk mengambil instance.
 final GetIt sl = GetIt.instance;
@@ -75,5 +81,21 @@ Future<void> configureDependencies() async {
   );
   sl.registerFactory<CheckoutCubit>(
     () => CheckoutCubit(sl<TransactionRepository>()),
+  );
+
+  // Receipt
+  sl.registerLazySingleton<ReceiptRepository>(
+    () => ReceiptRepositoryImpl(sl<DatabaseHelper>()),
+  );
+  sl.registerFactory<ReceiptCubit>(
+    () => ReceiptCubit(sl<ReceiptRepository>()),
+  );
+
+  // Settings
+  sl.registerLazySingleton<SettingsRepository>(
+    () => SettingsRepositoryImpl(sl<DatabaseHelper>()),
+  );
+  sl.registerLazySingleton<SettingsCubit>(
+    () => SettingsCubit(sl<SettingsRepository>()),
   );
 }

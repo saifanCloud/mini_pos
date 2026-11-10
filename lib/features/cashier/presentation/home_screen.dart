@@ -4,6 +4,7 @@ import '../../auth/presentation/cubit/auth_cubit.dart';
 import '../../auth/presentation/cubit/auth_state.dart';
 import '../../auth/presentation/screens/login_screen.dart';
 import '../../category/presentation/screens/master_data_screen.dart';
+import '../../settings/presentation/screens/settings_tab_view.dart';
 import 'cubit/cashier_cubit.dart';
 import 'screens/cashier_view.dart';
 
@@ -103,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
           subtitle: 'Ringkasan & riwayat transaksi akan hadir di Tahap 13.',
         );
       case 3:
-        return _buildSettingsTab();
+        return const SettingsTabView();
       default:
         return const SizedBox.shrink();
     }
@@ -137,101 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSettingsTab() {
-    final theme = Theme.of(context);
-    final authState = context.watch<AuthCubit>().state;
-    final currentUser = authState is AuthAuthenticated ? authState.user : null;
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerHighest,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: theme.colorScheme.primary,
-                  child: Text(
-                    currentUser?.name.isNotEmpty == true
-                        ? currentUser!.name[0].toUpperCase()
-                        : 'K',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        currentUser?.name ?? 'Kasir',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '@${currentUser?.username ?? 'user'}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        FilledButton.tonalIcon(
-          onPressed: () => _confirmLogout(context),
-          icon: Icon(Icons.logout, color: theme.colorScheme.error),
-          label: Text(
-            'Keluar Akun (Logout)',
-            style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold),
-          ),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _confirmLogout(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Keluar Akun'),
-        content: const Text('Apakah Anda yakin ingin keluar dari sesi kasir saat ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () {
-              Navigator.pop(dialogCtx);
-              context.read<AuthCubit>().logout();
-            },
-            child: const Text('Keluar'),
-          ),
-        ],
       ),
     );
   }

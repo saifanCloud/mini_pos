@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../auth/presentation/cubit/auth_cubit.dart';
 import '../../auth/presentation/cubit/auth_state.dart';
 import '../../auth/presentation/screens/login_screen.dart';
+import '../../category/presentation/screens/master_data_screen.dart';
 
 /// Layar utama shell aplikasi dengan navigasi 4 tab:
 /// Kasir, Produk, Laporan, dan Pengaturan.
@@ -93,11 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
           subtitle: 'Fitur kasir akan hadir di Tahap 10.',
         );
       case 1:
-        return _buildPlaceholder(
-          icon: Icons.inventory_2,
-          title: 'Master Data Produk',
-          subtitle: 'Kategori, produk, dan add-on akan hadir di Tahap 6-8.',
-        );
+        return const MasterDataScreen();
       case 2:
         return _buildPlaceholder(
           icon: Icons.bar_chart,

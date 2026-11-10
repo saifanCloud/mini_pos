@@ -1,5 +1,8 @@
 import 'package:get_it/get_it.dart';
 import '../database/database_helper.dart';
+import '../../features/addon/data/repositories/addon_repository_impl.dart';
+import '../../features/addon/domain/repositories/addon_repository.dart';
+import '../../features/addon/presentation/cubit/addon_cubit.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
@@ -32,7 +35,14 @@ Future<void> configureDependencies() async {
     () => CategoryCubit(sl<CategoryRepository>()),
   );
 
-  // TODO(tahap-7): daftarkan AddonRepository, AddonCubit
+  // Add-on
+  sl.registerLazySingleton<AddonRepository>(
+    () => AddonRepositoryImpl(sl<DatabaseHelper>()),
+  );
+  sl.registerFactory<AddonCubit>(
+    () => AddonCubit(sl<AddonRepository>()),
+  );
+
   // TODO(tahap-8): daftarkan ProductRepository, ProductCubit
   // dst per fitur
 }

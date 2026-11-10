@@ -4,11 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/rupiah_formatter.dart';
 import '../../domain/entities/discount.dart';
 import '../../domain/usecases/cart_logic.dart';
+import '../../../receipt/presentation/screens/receipt_screen.dart';
 import '../cubit/cart_cubit.dart';
 import '../cubit/cart_state.dart';
 import '../cubit/checkout_cubit.dart';
 import '../cubit/checkout_state.dart';
-import 'payment_success_screen.dart';
 
 /// Layar Pembayaran Kasir (F7, B2, B4, B5, D3 PRD).
 /// - Ringkasan pesanan keranjang
@@ -607,15 +607,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
       // 1. Kosongkan keranjang belanja
       cartCubit.clearCart();
 
-      // 2. Arahkan ke halaman Sukses Pembayaran
+      // 2. Arahkan ke halaman Struk Digital (Tahap 12)
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => PaymentSuccessScreen(
+          builder: (_) => ReceiptScreen(
             transactionId: txId,
-            total: totals.total,
-            paid: _paidAmount,
-            changeAmount: changeAmount,
           ),
         ),
       );

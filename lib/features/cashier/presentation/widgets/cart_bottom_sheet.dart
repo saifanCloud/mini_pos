@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/rupiah_formatter.dart';
 import '../cubit/cart_cubit.dart';
 import '../cubit/cart_state.dart';
-import '../screens/payment_placeholder_screen.dart';
+import '../screens/payment_screen.dart';
 
 /// Modal bottom sheet untuk melihat dan mengelola isi keranjang belanja kasir.
 /// Sesuai F6 PRD:
@@ -316,8 +316,7 @@ class CartBottomSheet extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    const PaymentPlaceholderScreen(),
+                                builder: (_) => const PaymentScreen(),
                               ),
                             );
                           },

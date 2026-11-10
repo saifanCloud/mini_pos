@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/rupiah_formatter.dart';
 import '../cubit/cart_cubit.dart';
 import '../cubit/cart_state.dart';
-import '../screens/payment_placeholder_screen.dart';
+import '../screens/payment_screen.dart';
 import 'cart_bottom_sheet.dart';
 
 /// Bar ringkasan keranjang yang melayang di bagian bawah layar kasir (F6 PRD).
@@ -132,7 +132,7 @@ class CartBottomBar extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const PaymentPlaceholderScreen(),
+                        builder: (_) => const PaymentScreen(),
                       ),
                     );
                   },

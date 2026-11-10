@@ -3,6 +3,9 @@ import '../database/database_helper.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
+import '../../features/category/data/repositories/category_repository_impl.dart';
+import '../../features/category/domain/repositories/category_repository.dart';
+import '../../features/category/presentation/cubit/category_cubit.dart';
 
 /// Service locator global. Gunakan `sl<T>()` untuk mengambil instance.
 final GetIt sl = GetIt.instance;
@@ -21,7 +24,15 @@ Future<void> configureDependencies() async {
     () => AuthCubit(sl<AuthRepository>()),
   );
 
-  // TODO(tahap-6): daftarkan CategoryRepository, CategoryCubit
+  // Category
+  sl.registerLazySingleton<CategoryRepository>(
+    () => CategoryRepositoryImpl(sl<DatabaseHelper>()),
+  );
+  sl.registerFactory<CategoryCubit>(
+    () => CategoryCubit(sl<CategoryRepository>()),
+  );
+
   // TODO(tahap-7): daftarkan AddonRepository, AddonCubit
+  // TODO(tahap-8): daftarkan ProductRepository, ProductCubit
   // dst per fitur
 }

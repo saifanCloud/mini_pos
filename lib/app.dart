@@ -9,6 +9,7 @@ import 'features/cashier/presentation/cubit/cashier_cubit.dart';
 import 'features/cashier/presentation/cubit/checkout_cubit.dart';
 import 'features/category/presentation/cubit/category_cubit.dart';
 import 'features/product/presentation/cubit/product_cubit.dart';
+import 'features/report/presentation/cubit/report_cubit.dart';
 import 'features/settings/presentation/cubit/settings_cubit.dart';
 
 /// Root aplikasi — MaterialApp dengan tema Material 3 dan Global BlocProviders.
@@ -42,6 +43,9 @@ class App extends StatelessWidget {
         ),
         BlocProvider<SettingsCubit>(
           create: (_) => sl<SettingsCubit>(),
+        ),
+        BlocProvider<ReportCubit>(
+          create: (_) => sl<ReportCubit>(),
         ),
       ],
       child: MaterialApp(

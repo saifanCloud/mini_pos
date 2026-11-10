@@ -20,6 +20,9 @@ import '../../features/product/presentation/cubit/product_cubit.dart';
 import '../../features/receipt/data/repositories/receipt_repository_impl.dart';
 import '../../features/receipt/domain/repositories/receipt_repository.dart';
 import '../../features/receipt/presentation/cubit/receipt_cubit.dart';
+import '../../features/report/data/repositories/report_repository_impl.dart';
+import '../../features/report/domain/repositories/report_repository.dart';
+import '../../features/report/presentation/cubit/report_cubit.dart';
 import '../../features/settings/data/repositories/settings_repository_impl.dart';
 import '../../features/settings/domain/repositories/settings_repository.dart';
 import '../../features/settings/presentation/cubit/settings_cubit.dart';
@@ -97,5 +100,13 @@ Future<void> configureDependencies() async {
   );
   sl.registerLazySingleton<SettingsCubit>(
     () => SettingsCubit(sl<SettingsRepository>()),
+  );
+
+  // Report (F9 PRD)
+  sl.registerLazySingleton<ReportRepository>(
+    () => ReportRepositoryImpl(sl<DatabaseHelper>()),
+  );
+  sl.registerFactory<ReportCubit>(
+    () => ReportCubit(sl<ReportRepository>()),
   );
 }

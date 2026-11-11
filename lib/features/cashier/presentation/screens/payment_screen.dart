@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/rupiah_formatter.dart';
+import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/empty_state.dart';
+import '../../../../core/widgets/price_text.dart';
+import '../../../../core/widgets/section_card.dart';
 import '../../domain/entities/discount.dart';
 import '../../domain/usecases/cart_logic.dart';
 import '../../../receipt/presentation/screens/receipt_screen.dart';
@@ -10,12 +15,14 @@ import '../cubit/cart_state.dart';
 import '../cubit/checkout_cubit.dart';
 import '../cubit/checkout_state.dart';
 
-/// Layar Pembayaran Kasir (F7, B2, B4, B5, D3 PRD).
-/// - Ringkasan pesanan keranjang
-/// - Input diskon (persen atau nominal) divalidasi dengan proteksi B4
-/// - Quick Cash tombol Uang Pas dan pembulatan pecahan di atas total
-/// - Hitungan kembalian instan
-/// - Konfirmasi pembayaran atomik
+/// Layar Pembayaran Kasir (F7, B2, B4, B5, D3 PRD & Tahap B).
+/// - Ringkasan pesanan keranjang terstruktur
+/// - Input diskon ringkas (persen atau nominal) divalidasi dengan proteksi B4
+/// - Total tagihan sangat menonjol
+/// - Input uang diterima dengan keyboard angka
+/// - Quick Cash chip besar (Uang Pas & pembulatan pecahan)
+/// - Hitungan kembalian instan dengan warna kontras
+/// - Tombol Konfirmasi Pembayaran besar selalu terlihat di bawah dengan indikator alasan jelas
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
 
@@ -78,13 +85,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return BlocConsumer<CheckoutCubit, CheckoutState>(
       listener: (context, checkoutState) {
         if (checkoutState.status == CheckoutStatus.failure) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(checkoutState.errorMessage ?? 'Pembayaran gagal'),
-              backgroundColor: Colors.red.shade700,
-              behavior: SnackBarBehavior.floating,
-            ),
+          AppSnackBar.showError(
+            context,
+            checkoutState.errorMessage ?? 'Pembayaran gagal disimpan',
           );
         }
       },
@@ -119,41 +122,119 @@ class _PaymentScreenState extends State<PaymentScreen> {
             final quickCashOptions =
                 CheckoutCubit.getQuickCashSuggestions(totals.total);
 
+            // Teks status alasan tombol nonaktif (UX Ergonomis)
+            String buttonLabel;
+            if (checkoutState.status == CheckoutStatus.submitting) {
+              buttonLabel = 'Memproses Transaksi...';
+            } else if (cart.isEmpty) {
+              buttonLabel = 'Keranjang Belanja Kosong';
+            } else if (discountError != null) {
+              buttonLabel = 'Periksa Kembali Diskon';
+            } else if (_paidAmount == 0) {
+              buttonLabel = 'Masukkan Uang Diterima';
+            } else if (!isPaidSufficient) {
+              buttonLabel = 'Uang Masih Kurang (${RupiahFormatter.format(totals.total - _paidAmount)})';
+            } else {
+              buttonLabel = 'Konfirmasi Bayar (${RupiahFormatter.format(totals.total)})';
+            }
+
             return Scaffold(
               appBar: AppBar(
-                title: const Text('Pembayaran'),
+                title: const Text('Pembayaran Tunai'),
                 centerTitle: true,
               ),
+              // Tombol Konfirmasi selalu terlihat di bawah dan melayang (PRD Bagian 12)
+              bottomNavigationBar: cart.isEmpty
+                  ? null
+                  : SafeArea(
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          AppSpacing.sm,
+                          AppSpacing.lg,
+                          AppSpacing.md,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          border: Border(
+                            top: BorderSide(
+                              color: theme.colorScheme.outlineVariant
+                                  .withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ),
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                          ),
+                          onPressed: canConfirm
+                              ? () => _handleConfirmPayment(
+                                    context: context,
+                                    cart: cart,
+                                    totals: totals,
+                                    changeAmount: changeAmount,
+                                  )
+                              : null,
+                          icon: checkoutState.status == CheckoutStatus.submitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle_outline_rounded),
+                          label: Text(
+                            buttonLabel,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ),
               body: cart.isEmpty
-                  ? const Center(
-                      child: Text('Keranjang belanja kosong'),
+                  ? EmptyState(
+                      icon: Icons.remove_shopping_cart_outlined,
+                      title: 'Keranjang Belanja Kosong',
+                      description:
+                          'Tidak ada produk yang siap dibayar. Kembali ke kasir untuk menambah item.',
+                      buttonText: 'Kembali ke Kasir',
+                      onButtonPressed: () => Navigator.pop(context),
                     )
                   : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(AppSpacing.lg),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // 1. Ringkasan Pesanan
-                          _buildCartSummaryCard(cartState, theme),
+                          // 1. Ringkasan Pesanan (SectionCard)
+                          _buildCartSummarySection(cartState, theme),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
 
                           // 2. Bagian Input Diskon (F7 & B4 PRD)
-                          _buildDiscountCard(
+                          _buildDiscountSection(
                             theme: theme,
                             subtotal: subtotal,
                             discountError: discountError,
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
 
-                          // 3. Ringkasan Biaya (Subtotal, Diskon, Total)
-                          _buildTotalsCard(totals, theme),
+                          // 3. Ringkasan Biaya (Subtotal, Diskon, Total Menonjol)
+                          _buildTotalsSection(totals, theme),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
 
                           // 4. Pembayaran Tunai & Quick Cash (D3 PRD)
-                          _buildCashPaymentCard(
+                          _buildCashPaymentSection(
                             theme: theme,
                             total: totals.total,
                             changeAmount: changeAmount,
@@ -161,47 +242,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             quickCashOptions: quickCashOptions,
                           ),
 
-                          const SizedBox(height: 24),
-
-                          // 5. Tombol Konfirmasi Pembayaran
-                          FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(52),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            onPressed: canConfirm
-                                ? () => _handleConfirmPayment(
-                                      context: context,
-                                      cart: cart,
-                                      totals: totals,
-                                      changeAmount: changeAmount,
-                                    )
-                                : null,
-                            icon: checkoutState.status ==
-                                    CheckoutStatus.submitting
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.check_circle_outline),
-                            label: Text(
-                              checkoutState.status ==
-                                      CheckoutStatus.submitting
-                                  ? 'Memproses Transaksi...'
-                                  : 'Konfirmasi Pembayaran (${RupiahFormatter.format(totals.total)})',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
+                          // Jarak penutup agar konten paling bawah nyaman dibaca
+                          const SizedBox(height: AppSpacing.md),
                         ],
                       ),
                     ),
@@ -212,222 +254,183 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _buildCartSummaryCard(CartState cartState, ThemeData theme) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.receipt_outlined,
-                  size: 20,
-                  color: theme.colorScheme.primary,
+  Widget _buildCartSummarySection(CartState cartState, ThemeData theme) {
+    return SectionCard(
+      icon: Icons.receipt_long_outlined,
+      title: 'Ringkasan Pesanan (${cartState.totalItems} item)',
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: cartState.lines.length,
+        separatorBuilder: (_, _) => const Divider(height: 14),
+        itemBuilder: (context, index) {
+          final line = cartState.lines[index];
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Ringkasan Pesanan (${cartState.totalItems} item)',
-                  style: const TextStyle(
+                child: Text(
+                  '${line.qty}x',
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 12,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
-              ],
-            ),
-            const Divider(height: 18),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: cartState.lines.length,
-              separatorBuilder: (_, _) => const Divider(height: 12),
-              itemBuilder: (context, index) {
-                final line = cartState.lines[index];
-                return Row(
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${line.qty}x',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            line.product.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
-                            ),
-                          ),
-                          if (line.selectedAddons.isNotEmpty)
-                            Text(
-                              '+ ${line.selectedAddons.map((a) => a.name).join(", ")}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      RupiahFormatter.format(line.subtotal),
+                      line.product.name,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
                     ),
+                    if (line.selectedAddons.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          '+ ${line.selectedAddons.map((a) => a.name).join(", ")}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.tertiary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                   ],
-                );
-              },
-            ),
-          ],
-        ),
+                ),
+              ),
+              PriceText(
+                line.subtotal,
+                size: PriceSize.small,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDiscountCard({
+  Widget _buildDiscountSection({
     required ThemeData theme,
     required int subtotal,
     required String? discountError,
   }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.discount_outlined,
-                  size: 20,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Diskon (Opsional)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Segmented Button Tipe Diskon
-            SegmentedButton<DiscountType?>(
-              segments: const [
-                ButtonSegment<DiscountType?>(
-                  value: null,
-                  label: Text('Tanpa Diskon'),
-                ),
-                ButtonSegment<DiscountType?>(
-                  value: DiscountType.percent,
-                  label: Text('Persen (%)'),
-                ),
-                ButtonSegment<DiscountType?>(
-                  value: DiscountType.fixed,
-                  label: Text('Nominal (Rp)'),
-                ),
-              ],
-              selected: {_selectedDiscountType},
-              onSelectionChanged: (selected) {
-                _onDiscountTypeChanged(selected.first);
-              },
-            ),
-
-            if (_selectedDiscountType != null) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _discountController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: _selectedDiscountType == DiscountType.percent
-                      ? 'Nilai Diskon Persen (0 - 100)'
-                      : 'Nilai Diskon Nominal (Rp)',
-                  prefixText:
-                      _selectedDiscountType == DiscountType.fixed ? 'Rp ' : null,
-                  suffixText:
-                      _selectedDiscountType == DiscountType.percent ? '%' : null,
-                  errorText: discountError,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                ),
-                onChanged: _onDiscountValueChanged,
+    return SectionCard(
+      icon: Icons.discount_outlined,
+      title: 'Diskon Belanja (Opsional)',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Segmented Button Tipe Diskon
+          SegmentedButton<DiscountType?>(
+            segments: const [
+              ButtonSegment<DiscountType?>(
+                value: null,
+                label: Text('Tanpa Diskon'),
+              ),
+              ButtonSegment<DiscountType?>(
+                value: DiscountType.percent,
+                label: Text('Persen (%)'),
+              ),
+              ButtonSegment<DiscountType?>(
+                value: DiscountType.fixed,
+                label: Text('Nominal (Rp)'),
               ),
             ],
+            selected: {_selectedDiscountType},
+            onSelectionChanged: (selected) {
+              _onDiscountTypeChanged(selected.first);
+            },
+          ),
+
+          if (_selectedDiscountType != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _discountController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: _selectedDiscountType == DiscountType.percent
+                    ? 'Nilai Diskon Persen (0 - 100)'
+                    : 'Nilai Diskon Nominal (Rp)',
+                prefixText:
+                    _selectedDiscountType == DiscountType.fixed ? 'Rp ' : null,
+                suffixText:
+                    _selectedDiscountType == DiscountType.percent ? '%' : null,
+                errorText: discountError,
+              ),
+              onChanged: _onDiscountValueChanged,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildTotalsCard(CheckoutTotals totals, ThemeData theme) {
+  Widget _buildTotalsSection(CheckoutTotals totals, ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(14),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
       ),
       child: Column(
         children: [
-          _buildRowItem('Subtotal', RupiahFormatter.format(totals.subtotal)),
+          _buildRowItem(
+            'Subtotal',
+            PriceText(totals.subtotal, size: PriceSize.small, color: theme.colorScheme.onSurface),
+          ),
           if (totals.hasDiscount) ...[
-            const SizedBox(height: 6),
-            _buildRowItem(
-              'Diskon (${totals.discountType == DiscountType.percent ? "${totals.discountValue}%" : "Nominal"})',
-              '- ${RupiahFormatter.format(totals.discountAmount)}',
-              valueColor: Colors.red.shade700,
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Potongan Diskon (${totals.discountType == DiscountType.percent ? "${totals.discountValue}%" : "Nominal"})',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.red.shade700,
+                  ),
+                ),
+                Text(
+                  '- ${RupiahFormatter.format(totals.discountAmount)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700,
+                  ),
+                ),
+              ],
             ),
           ],
-          const Divider(height: 18),
+          const Divider(height: AppSpacing.lg),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Total Tagihan',
+                'Total Tagihan:',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Text(
-                RupiahFormatter.format(totals.total),
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
-                ),
+              PriceText(
+                totals.total,
+                size: PriceSize.large,
               ),
             ],
           ),
@@ -436,137 +439,107 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _buildCashPaymentCard({
+  Widget _buildCashPaymentSection({
     required ThemeData theme,
     required int total,
     required int changeAmount,
     required bool isPaidSufficient,
     required List<int> quickCashOptions,
   }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.payments_outlined,
-                  size: 20,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Uang Diterima (Tunai)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
+    return SectionCard(
+      icon: Icons.payments_outlined,
+      title: 'Pembayaran Tunai',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Input Nominal Uang Diterima
+          TextField(
+            controller: _paidController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 12),
+            decoration: const InputDecoration(
+              labelText: 'Uang Diterima dari Pelanggan',
+              prefixText: 'Rp ',
+              hintText: '0',
+            ),
+            onChanged: _onPaidAmountChanged,
+          ),
 
-            // Input Nominal Uang Diterima
-            TextField(
-              controller: _paidController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+          const SizedBox(height: AppSpacing.md),
+
+          // Pilihan Quick Cash (D3 PRD)
+          Text(
+            'Pilihan Cepat (Quick Cash):',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              // Tombol Uang Pas
+              ActionChip(
+                avatar: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text(
+                  'Uang Pas',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                onPressed: () => _applyQuickCash(total),
               ),
-              decoration: InputDecoration(
-                prefixText: 'Rp ',
-                hintText: '0',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 14,
+              // Tombol Pecahan Pembulatan
+              ...quickCashOptions.map((opt) {
+                return ActionChip(
+                  label: Text(
+                    RupiahFormatter.format(opt),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  onPressed: () => _applyQuickCash(opt),
+                );
+              }),
+            ],
+          ),
+
+          const Divider(height: AppSpacing.xl),
+
+          // Tampilan Kembalian / Kekurangan
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isPaidSufficient ? 'Kembalian:' : 'Uang Masih Kurang:',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isPaidSufficient
+                      ? Colors.green.shade800
+                      : theme.colorScheme.error,
                 ),
               ),
-              onChanged: _onPaidAmountChanged,
-            ),
-
-            const SizedBox(height: 12),
-
-            // Tombol Quick Cash (D3 PRD)
-            const Text(
-              'Quick Cash:',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
+              PriceText(
+                isPaidSufficient ? changeAmount : (total - _paidAmount),
+                size: PriceSize.large,
+                color: isPaidSufficient
+                    ? Colors.green.shade800
+                    : theme.colorScheme.error,
               ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                // Tombol Uang Pas
-                ActionChip(
-                  avatar: const Icon(Icons.check, size: 16),
-                  label: const Text('Uang Pas'),
-                  onPressed: () => _applyQuickCash(total),
-                ),
-                // Tombol Pembulatan
-                ...quickCashOptions.map((opt) {
-                  return ActionChip(
-                    label: Text(RupiahFormatter.format(opt)),
-                    onPressed: () => _applyQuickCash(opt),
-                  );
-                }),
-              ],
-            ),
-
-            const Divider(height: 22),
-
-            // Kembalian / Status Pembayaran
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  isPaidSufficient ? 'Kembalian:' : 'Uang Masih Kurang:',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: isPaidSufficient
-                        ? Colors.green.shade800
-                        : theme.colorScheme.error,
-                  ),
-                ),
-                Text(
-                  isPaidSufficient
-                      ? RupiahFormatter.format(changeAmount)
-                      : RupiahFormatter.format(total - _paidAmount),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isPaidSufficient
-                        ? Colors.green.shade800
-                        : theme.colorScheme.error,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildRowItem(String label, String value, {Color? valueColor}) {
+  Widget _buildRowItem(String label, Widget trailing) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -574,14 +547,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           label,
           style: const TextStyle(fontSize: 14),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: valueColor,
-          ),
-        ),
+        trailing,
       ],
     );
   }
@@ -619,4 +585,3 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 }
-

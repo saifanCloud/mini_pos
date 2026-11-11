@@ -1,14 +1,20 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/image_storage.dart';
 import '../../../../core/utils/rupiah_formatter.dart';
+import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/price_text.dart';
+import '../../../../core/widgets/primary_button.dart';
 import '../../../addon/domain/entities/addon.dart';
 import '../../../product/domain/entities/product.dart';
 import '../cubit/cart_cubit.dart';
 
-/// Modal bottom sheet untuk memilih add-on pada produk F&B / retail.
-/// Sesuai F6 PRD: kasir mencentang add-on yang diinginkan lalu menekan "Tambah".
+/// Modal bottom sheet untuk memilih add-on pada produk F&B / retail (Tahap B).
+/// Sesuai F6 PRD:
+/// - Kasir mencentang add-on yang diinginkan lalu menekan tombol "Tambah".
+/// - Menampilkan nama produk, harga dasar, pilihan add-on, sisa stok, dan total unit berjalan.
 class AddonSelectionBottomSheet extends StatefulWidget {
   final Product product;
   final List<Addon> availableAddons;
@@ -29,7 +35,9 @@ class AddonSelectionBottomSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xl),
+        ),
       ),
       builder: (_) => AddonSelectionBottomSheet(
         product: product,
@@ -85,7 +93,10 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
               // Drag Handle
               Center(
                 child: Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  margin: const EdgeInsets.only(
+                    top: AppSpacing.md,
+                    bottom: AppSpacing.sm,
+                  ),
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
@@ -95,14 +106,16 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
                 ),
               ),
 
-              // Header Produk
+              // 1. Header Produk
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.sm,
+                ),
                 child: Row(
                   children: [
                     _buildProductThumbnail(theme),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,20 +123,16 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
                           Text(
                             widget.product.name,
                             style: const TextStyle(
-                              fontSize: 18,
+                              fontSize: 17,
                               fontWeight: FontWeight.bold,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            RupiahFormatter.format(widget.product.price),
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          const SizedBox(height: 3),
+                          PriceText(
+                            widget.product.price,
+                            size: PriceSize.small,
                           ),
                         ],
                       ),
@@ -138,10 +147,12 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
 
               const Divider(height: 1),
 
-              // Judul Pilihan Add-on
+              // 2. Judul Pilihan Add-on
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.md,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -152,22 +163,34 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      '${_selectedAddonIds.length} dipilih',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer
+                            .withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(AppRadius.xs),
+                      ),
+                      child: Text(
+                        '${_selectedAddonIds.length} dipilih',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // Daftar Checkbox Add-on
+              // 3. Daftar Checkbox Add-on
               Flexible(
                 child: widget.availableAddons.isEmpty
                     ? const Padding(
-                        padding: EdgeInsets.all(24),
+                        padding: EdgeInsets.all(AppSpacing.xl),
                         child: Center(
                           child: Text(
                             'Tidak ada add-on aktif untuk produk ini',
@@ -175,12 +198,14 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
                           ),
                         ),
                       )
-                    : ListView.builder(
+                    : ListView.separated(
                         shrinkWrap: true,
                         itemCount: widget.availableAddons.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (context, index) {
                           final addon = widget.availableAddons[index];
                           final isOutOfStock = addon.stock <= 0;
+                          final isLowStock = !isOutOfStock && addon.stock <= 3;
                           final isSelected =
                               _selectedAddonIds.contains(addon.id);
 
@@ -188,10 +213,14 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
                             value: isSelected,
                             enabled: !isOutOfStock,
                             activeColor: theme.colorScheme.primary,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg,
+                              vertical: 2,
+                            ),
                             title: Text(
                               addon.name,
                               style: TextStyle(
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                                 decoration: isOutOfStock
                                     ? TextDecoration.lineThrough
                                     : null,
@@ -200,15 +229,36 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
                                     : null,
                               ),
                             ),
-                            subtitle: Text(
-                              '+ ${RupiahFormatter.format(addon.price)} • '
-                              '${isOutOfStock ? "Stok Habis" : "Sisa stok: ${addon.stock}"}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isOutOfStock
-                                    ? theme.colorScheme.error
-                                    : theme.colorScheme.onSurfaceVariant,
-                              ),
+                            subtitle: Row(
+                              children: [
+                                Text(
+                                  '+ ${RupiahFormatter.format(addon.price)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                                const Text('  •  '),
+                                Text(
+                                  isOutOfStock
+                                      ? 'Stok habis'
+                                      : isLowStock
+                                          ? 'Sisa: ${addon.stock} (Menipis)'
+                                          : 'Sisa stok: ${addon.stock}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isOutOfStock
+                                        ? theme.colorScheme.error
+                                        : isLowStock
+                                            ? Colors.orange.shade800
+                                            : theme.colorScheme.onSurfaceVariant,
+                                    fontWeight: isLowStock || isOutOfStock
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
                             ),
                             onChanged: isOutOfStock
                                 ? null
@@ -228,9 +278,9 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
 
               const Divider(height: 1),
 
-              // Footer: Subtotal Unit & Tombol Tambah
+              // 4. Footer: Subtotal Unit & Tombol Tambah
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Row(
                   children: [
                     Expanded(
@@ -238,65 +288,44 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Harga Satuan',
+                            'Harga Satuan:',
                             style: TextStyle(
                               fontSize: 12,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
-                          Text(
-                            RupiahFormatter.format(_unitTotalPrice),
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.primary,
-                            ),
+                          const SizedBox(height: 2),
+                          PriceText(
+                            _unitTotalPrice,
+                            size: PriceSize.large,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
-                        ),
-                        minimumSize: const Size(160, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        // Tambahkan ke keranjang via CartCubit
-                        final result = context.read<CartCubit>().addToCart(
-                              widget.product,
-                              _selectedAddons,
-                            );
+                    const SizedBox(width: AppSpacing.lg),
+                    SizedBox(
+                      width: 170,
+                      child: PrimaryButton(
+                        height: 52,
+                        icon: Icons.add_shopping_cart_rounded,
+                        label: 'Tambah',
+                        onPressed: () {
+                          // Tambahkan ke keranjang via CartCubit
+                          final result = context.read<CartCubit>().addToCart(
+                                widget.product,
+                                _selectedAddons,
+                              );
 
-                        if (!result.isValid) {
-                          // Tampilkan pesan error stok jika ditolak
-                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                result.message ?? 'Stok tidak mencukupi',
-                              ),
-                              backgroundColor: Colors.red.shade700,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        } else {
-                          Navigator.pop(context);
-                        }
-                      },
-                      icon: const Icon(Icons.add_shopping_cart),
-                      label: const Text(
-                        'Tambah',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
+                          if (!result.isValid) {
+                            // Tampilkan pesan error stok jika ditolak
+                            AppSnackBar.showError(
+                              context,
+                              result.message ?? 'Stok tidak mencukupi',
+                            );
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
                       ),
                     ),
                   ],
@@ -316,11 +345,11 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
         final path = snapshot.data;
         if (path != null && File(path).existsSync()) {
           return ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             child: Image.file(
               File(path),
-              width: 50,
-              height: 50,
+              width: 52,
+              height: 52,
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => _buildPlaceholder(theme),
             ),
@@ -333,18 +362,17 @@ class _AddonSelectionBottomSheetState extends State<AddonSelectionBottomSheet> {
 
   Widget _buildPlaceholder(ThemeData theme) {
     return Container(
-      width: 50,
-      height: 50,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(8),
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Icon(
         Icons.inventory_2_outlined,
         color: theme.colorScheme.primary,
-        size: 24,
+        size: 26,
       ),
     );
   }
 }
-

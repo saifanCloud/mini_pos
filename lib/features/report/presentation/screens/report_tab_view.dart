@@ -3,12 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/rupiah_formatter.dart';
 import '../../../receipt/presentation/screens/receipt_screen.dart';
+import '../../domain/entities/report_filter.dart';
 import '../cubit/report_cubit.dart';
 import '../cubit/report_state.dart';
 
-/// Layar Tab Laporan Penjualan & Riwayat Transaksi (F9 PRD).
-/// Menampilkan kartu ringkasan omzet dan jumlah transaksi sukses,
-/// serta riwayat transaksi terbaru di atas yang dapat diketuk untuk melihat struk digital.
+/// Layar Tab Laporan Penjualan & Riwayat Transaksi dengan Filter Periode (F9 & D2 PRD).
+/// - Pilihan cepat: Hari ini (default), 7 hari terakhir, Bulan ini, dan Kustom (date range picker).
+/// - Kartu ringkasan omzet dan jumlah transaksi mengikuti filter aktif.
+/// - Riwayat transaksi terurut terbaru di atas yang dapat diketuk untuk melihat struk digital.
 class ReportTabView extends StatefulWidget {
   const ReportTabView({super.key});
 
@@ -65,13 +67,45 @@ class _ReportTabViewState extends State<ReportTabView> {
           }
 
           final summary = state.summary;
+          final dateRange = state.activeDateRange;
+          final dateRangeText = _formatDateRangeSubtitle(dateRange.start, dateRange.end);
 
           return RefreshIndicator(
             onRefresh: () => context.read<ReportCubit>().loadReport(),
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // 1. Kartu Ringkasan Penjualan (F9 PRD)
+                // 1. Baris Filter Cepat Tanggal (D2 PRD)
+                _buildFilterChips(context, state),
+
+                const SizedBox(height: 8),
+
+                // Info rentang tanggal aktif
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 14,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        dateRangeText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // 2. Kartu Ringkasan Penjualan (F9 & D2 PRD)
                 Row(
                   children: [
                     // Total Omzet
@@ -104,7 +138,7 @@ class _ReportTabViewState extends State<ReportTabView> {
 
                 const SizedBox(height: 24),
 
-                // 2. Header Bagian Riwayat
+                // 3. Header Bagian Riwayat
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -126,9 +160,9 @@ class _ReportTabViewState extends State<ReportTabView> {
                 ),
                 const SizedBox(height: 10),
 
-                // 3. Daftar Riwayat Transaksi / Empty State (F9 PRD)
+                // 4. Daftar Riwayat Transaksi / Empty State (F9 & D2 PRD)
                 if (summary.isEmpty)
-                  _buildEmptyState(theme)
+                  _buildEmptyState(theme, dateRangeText)
                 else
                   ListView.separated(
                     shrinkWrap: true,
@@ -263,6 +297,94 @@ class _ReportTabViewState extends State<ReportTabView> {
     );
   }
 
+  Widget _buildFilterChips(BuildContext context, ReportState state) {
+    final cubit = context.read<ReportCubit>();
+
+    String customLabel = 'Kustom';
+    if (state.filterType == ReportFilterType.custom &&
+        state.customStart != null &&
+        state.customEnd != null) {
+      final startFmt = DateFormat('d/M').format(state.customStart!);
+      final endFmt = DateFormat('d/M').format(state.customEnd!);
+      customLabel = '$startFmt - $endFmt';
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          // Hari Ini (Bawaan)
+          ChoiceChip(
+            label: const Text('Hari ini'),
+            selected: state.filterType == ReportFilterType.today,
+            onSelected: (_) => cubit.setFilter(ReportFilterType.today),
+          ),
+          const SizedBox(width: 8),
+
+          // 7 Hari Terakhir
+          ChoiceChip(
+            label: const Text('7 hari terakhir'),
+            selected: state.filterType == ReportFilterType.last7Days,
+            onSelected: (_) => cubit.setFilter(ReportFilterType.last7Days),
+          ),
+          const SizedBox(width: 8),
+
+          // Bulan Ini
+          ChoiceChip(
+            label: const Text('Bulan ini'),
+            selected: state.filterType == ReportFilterType.thisMonth,
+            onSelected: (_) => cubit.setFilter(ReportFilterType.thisMonth),
+          ),
+          const SizedBox(width: 8),
+
+          // Rentang Kustom (Date Range Picker)
+          ChoiceChip(
+            avatar: const Icon(Icons.date_range, size: 16),
+            label: Text(customLabel),
+            selected: state.filterType == ReportFilterType.custom,
+            onSelected: (_) => _pickCustomRange(context, state),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickCustomRange(BuildContext context, ReportState state) async {
+    final now = DateTime.now();
+    final initialStart = state.customStart ?? now;
+    final initialEnd = state.customEnd ?? now;
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
+      helpText: 'Pilih Rentang Tanggal Laporan',
+      cancelText: 'Batal',
+      confirmText: 'Pilih',
+    );
+
+    if (picked != null && context.mounted) {
+      context.read<ReportCubit>().setFilter(
+            ReportFilterType.custom,
+            customStart: picked.start,
+            customEnd: picked.end,
+          );
+    }
+  }
+
+  String _formatDateRangeSubtitle(DateTime start, DateTime end) {
+    final startFmt = DateFormat('d MMM yyyy').format(start);
+    final endFmt = DateFormat('d MMM yyyy').format(end);
+
+    if (start.year == end.year &&
+        start.month == end.month &&
+        start.day == end.day) {
+      return 'Periode: $startFmt';
+    }
+    return 'Periode: $startFmt s/d $endFmt';
+  }
+
   Widget _buildMetricCard({
     required String title,
     required String value,
@@ -316,9 +438,9 @@ class _ReportTabViewState extends State<ReportTabView> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(ThemeData theme, String periodText) {
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.all(36),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(16),
@@ -331,10 +453,10 @@ class _ReportTabViewState extends State<ReportTabView> {
         children: [
           Icon(
             Icons.receipt_long_outlined,
-            size: 64,
+            size: 60,
             color: theme.colorScheme.outlineVariant,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           const Text(
             'Belum Ada Transaksi',
             style: TextStyle(
@@ -344,7 +466,7 @@ class _ReportTabViewState extends State<ReportTabView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Transaksi yang berhasil diselesaikan di tab Kasir akan otomatis tercatat di sini.',
+            'Tidak ditemukan transaksi penjualan untuk $periodText.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -356,4 +478,3 @@ class _ReportTabViewState extends State<ReportTabView> {
     );
   }
 }
-

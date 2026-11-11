@@ -4,6 +4,8 @@ import '../../auth/presentation/cubit/auth_cubit.dart';
 import '../../auth/presentation/cubit/auth_state.dart';
 import '../../auth/presentation/screens/login_screen.dart';
 import '../../category/presentation/screens/master_data_screen.dart';
+import '../../report/presentation/cubit/report_cubit.dart';
+import '../../report/presentation/screens/report_tab_view.dart';
 import '../../settings/presentation/screens/settings_tab_view.dart';
 import 'cubit/cashier_cubit.dart';
 import 'screens/cashier_view.dart';
@@ -47,6 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
             });
             if (index == 0) {
               context.read<CashierCubit>().loadData();
+            }
+            // Muat ulang laporan setiap kali tab Laporan dibuka
+            if (index == 2) {
+              context.read<ReportCubit>().loadReport();
             }
           },
           destinations: const [
@@ -98,47 +104,11 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return const MasterDataScreen();
       case 2:
-        return _buildPlaceholder(
-          icon: Icons.bar_chart,
-          title: 'Laporan Penjualan',
-          subtitle: 'Ringkasan & riwayat transaksi akan hadir di Tahap 13.',
-        );
+        return const ReportTabView();
       case 3:
         return const SettingsTabView();
       default:
         return const SizedBox.shrink();
     }
-  }
-
-  Widget _buildPlaceholder({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 64, color: theme.colorScheme.primary.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

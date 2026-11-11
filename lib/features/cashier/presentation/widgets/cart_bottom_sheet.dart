@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/utils/rupiah_formatter.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/empty_state.dart';
+import '../../../../core/widgets/price_text.dart';
+import '../../../../core/widgets/primary_button.dart';
 import '../cubit/cart_cubit.dart';
 import '../cubit/cart_state.dart';
 import '../screens/payment_screen.dart';
 
-/// Modal bottom sheet untuk melihat dan mengelola isi keranjang belanja kasir.
-/// Sesuai F6 PRD:
-/// - Mengubah qty dengan tombol plus dan minus.
-/// - Qty 0 menghapus baris.
-/// - Tombol kosongkan keranjang dengan konfirmasi dialog.
-/// - Tombol Bayar menuju halaman placeholder (Tahap 11).
+/// Modal bottom sheet untuk melihat dan mengelola isi keranjang belanja kasir (Tahap B).
+/// Sesuai F6 PRD & Bagian 12:
+/// - Mengubah qty dengan tombol plus dan minus (area sentuh minimal 48x48 dp).
+/// - Geser baris ke samping (swipe to dismiss) untuk menghapus item.
+/// - Tombol kosongkan keranjang dengan dialog konfirmasi.
+/// - Tombol Bayar besar yang mengarahkan ke layar pembayaran.
 class CartBottomSheet extends StatelessWidget {
   const CartBottomSheet({super.key});
 
@@ -20,7 +24,9 @@ class CartBottomSheet extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.xl),
+        ),
       ),
       builder: (_) => const CartBottomSheet(),
     );
@@ -45,7 +51,10 @@ class CartBottomSheet extends StatelessWidget {
                 // Drag handle
                 Center(
                   child: Container(
-                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    margin: const EdgeInsets.only(
+                      top: AppSpacing.md,
+                      bottom: AppSpacing.sm,
+                    ),
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
@@ -55,20 +64,22 @@ class CartBottomSheet extends StatelessWidget {
                   ),
                 ),
 
-                // Header Keranjang
+                // 1. Header Keranjang
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.sm,
+                  ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.shopping_cart_outlined,
                         color: theme.colorScheme.primary,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
-                          'Keranjang (${state.totalItems})',
+                          'Keranjang Belanja (${state.totalItems})',
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
@@ -100,174 +111,181 @@ class CartBottomSheet extends StatelessWidget {
 
                 const Divider(height: 1),
 
-                // Daftar Item Keranjang
+                // 2. Daftar Item Keranjang (Swipe to dismiss)
                 Flexible(
                   child: state.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.all(48),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.remove_shopping_cart_outlined,
-                                  size: 64,
-                                  color: theme.colorScheme.outlineVariant,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Keranjang masih kosong',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                          child: EmptyState(
+                            icon: Icons.remove_shopping_cart_outlined,
+                            title: 'Keranjang Masih Kosong',
+                            description:
+                                'Pilih produk dari katalog untuk mulai menambahkan pesanan pelanggan.',
                           ),
                         )
                       : ListView.separated(
                           shrinkWrap: true,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                            horizontal: AppSpacing.lg,
+                            vertical: AppSpacing.md,
                           ),
                           itemCount: state.lines.length,
-                          separatorBuilder: (_, _) =>
-                              const Divider(height: 16),
+                          separatorBuilder: (_, _) => const Divider(height: 16),
                           itemBuilder: (context, index) {
                             final line = state.lines[index];
                             final cartCubit = context.read<CartCubit>();
 
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Nama produk & Add-on terpilih
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        line.product.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                                      if (line.selectedAddons.isNotEmpty)
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 2),
-                                          child: Text(
-                                            '+ ${line.selectedAddons.map((a) => a.name).join(', ')}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: theme.colorScheme.tertiary,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        RupiahFormatter.format(line.unitPrice),
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: theme
-                                              .colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            // Geser ke samping untuk menghapus baris (Tahap B)
+                            return Dismissible(
+                              key: ValueKey('cart_line_${line.product.id}_${line.selectedAddons.map((a) => a.id).join("_")}_$index'),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: AppSpacing.lg),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.error,
+                                  borderRadius: BorderRadius.circular(AppRadius.md),
                                 ),
-
-                                // Pengatur Kuantitas (- / qty / +)
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
-                                    // Tombol Minus (jika 1, ikon tong sampah untuk hapus)
-                                    IconButton(
-                                      iconSize: 18,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 32,
-                                        minHeight: 32,
+                                    Icon(Icons.delete_outline, color: Colors.white),
+                                    SizedBox(width: AppSpacing.xs),
+                                    Text(
+                                      'Hapus',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      padding: EdgeInsets.zero,
-                                      visualDensity: VisualDensity.compact,
-                                      icon: Icon(
-                                        line.qty == 1
-                                            ? Icons.delete_outline
-                                            : Icons.remove,
-                                        color: line.qty == 1
-                                            ? theme.colorScheme.error
-                                            : null,
-                                      ),
-                                      onPressed: () =>
-                                          cartCubit.decrementQty(index),
-                                    ),
-                                    Container(
-                                      constraints:
-                                          const BoxConstraints(minWidth: 26),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        '${line.qty}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                    // Tombol Plus (validasi stok B1 PRD)
-                                    IconButton(
-                                      iconSize: 18,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 32,
-                                        minHeight: 32,
-                                      ),
-                                      padding: EdgeInsets.zero,
-                                      visualDensity: VisualDensity.compact,
-                                      icon: const Icon(Icons.add),
-                                      onPressed: () {
-                                        final result =
-                                            cartCubit.incrementQty(index);
-                                        if (!result.isValid) {
-                                          ScaffoldMessenger.of(context)
-                                              .hideCurrentSnackBar();
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                result.message ??
-                                                    'Stok tidak mencukupi',
-                                              ),
-                                              backgroundColor:
-                                                  Colors.red.shade700,
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                            ),
-                                          );
-                                        }
-                                      },
                                     ),
                                   ],
                                 ),
-
-                                const SizedBox(width: 8),
-
-                                // Subtotal per baris
-                                SizedBox(
-                                  width: 76,
-                                  child: Text(
-                                    RupiahFormatter.format(line.subtotal),
-                                    textAlign: TextAlign.end,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: theme.colorScheme.primary,
+                              ),
+                              onDismissed: (_) {
+                                cartCubit.removeLine(index);
+                                AppSnackBar.showInfo(
+                                  context,
+                                  '${line.product.name} dihapus dari keranjang',
+                                );
+                              },
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Nama produk & Add-on terpilih
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          line.product.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (line.selectedAddons.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 2),
+                                            child: Text(
+                                              '+ ${line.selectedAddons.map((a) => a.name).join(', ')}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: theme.colorScheme.tertiary,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        const SizedBox(height: 3),
+                                        PriceText(
+                                          line.unitPrice,
+                                          size: PriceSize.small,
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                          isBold: false,
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ),
-                              ],
+
+                                  // Pengatur Kuantitas (- / qty / +) dengan area ketuk >= 48 dp
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Tombol Minus
+                                      IconButton(
+                                        iconSize: 20,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 48,
+                                          minHeight: 48,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        icon: Icon(
+                                          line.qty == 1
+                                              ? Icons.delete_outline
+                                              : Icons.remove_circle_outline,
+                                          color: line.qty == 1
+                                              ? theme.colorScheme.error
+                                              : theme.colorScheme.primary,
+                                        ),
+                                        onPressed: () =>
+                                            cartCubit.decrementQty(index),
+                                      ),
+                                      Container(
+                                        constraints: const BoxConstraints(minWidth: 26),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          '${line.qty}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ),
+                                      // Tombol Plus (validasi stok B1 PRD)
+                                      IconButton(
+                                        iconSize: 20,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 48,
+                                          minHeight: 48,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        icon: Icon(
+                                          Icons.add_circle_outline,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                        onPressed: () {
+                                          final result =
+                                              cartCubit.incrementQty(index);
+                                          if (!result.isValid) {
+                                            AppSnackBar.showError(
+                                              context,
+                                              result.message ??
+                                                  'Stok tidak mencukupi',
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(width: AppSpacing.sm),
+
+                                  // Subtotal per baris
+                                  SizedBox(
+                                    width: 78,
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: PriceText(
+                                        line.subtotal,
+                                        size: PriceSize.small,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             );
                           },
                         ),
@@ -276,9 +294,9 @@ class CartBottomSheet extends StatelessWidget {
                 if (state.isNotEmpty) ...[
                   const Divider(height: 1),
 
-                  // Footer: Total & Tombol Bayar
+                  // 3. Footer: Total & Tombol Bayar
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -286,31 +304,23 @@ class CartBottomSheet extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Total Pembayaran:',
+                              'Total Belanja:',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
-                              RupiahFormatter.format(state.subtotal),
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
-                              ),
+                            PriceText(
+                              state.subtotal,
+                              size: PriceSize.large,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                        const SizedBox(height: AppSpacing.md),
+                        PrimaryButton(
+                          height: 52,
+                          icon: Icons.payments_outlined,
+                          label: 'Lanjut ke Pembayaran',
                           onPressed: () {
                             Navigator.pop(context); // Tutup bottom sheet
                             Navigator.push(
@@ -320,14 +330,6 @@ class CartBottomSheet extends StatelessWidget {
                               ),
                             );
                           },
-                          icon: const Icon(Icons.payment),
-                          label: const Text(
-                            'Bayar',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                         ),
                       ],
                     ),
@@ -357,6 +359,7 @@ class CartBottomSheet extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
+              minimumSize: const Size(100, 44),
             ),
             onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('Kosongkan'),
@@ -366,8 +369,8 @@ class CartBottomSheet extends StatelessWidget {
     ).then((confirmed) {
       if (confirmed == true && context.mounted) {
         context.read<CartCubit>().clearCart();
+        AppSnackBar.showInfo(context, 'Keranjang belanja dikosongkan');
       }
     });
   }
 }
-

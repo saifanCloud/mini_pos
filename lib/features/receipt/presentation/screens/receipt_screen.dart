@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/rupiah_formatter.dart';
+import '../../../../core/widgets/error_view.dart';
+import '../../../../core/widgets/loading_view.dart';
+import '../../../../core/widgets/primary_button.dart';
 import '../../../cashier/domain/entities/transaction_entity.dart';
 import '../../../cashier/presentation/cubit/cashier_cubit.dart';
 import '../cubit/receipt_cubit.dart';
 import '../cubit/receipt_state.dart';
 
-/// Layar Struk Digital Penjualan (F8 & B2 PRD).
-/// Menampilkan struk bergaya kertas kasir yang bersumber murni dari data snapshot.
+/// Layar Struk Digital Penjualan (F8, B2 PRD & Tahap B).
+/// Menampilkan struk bergaya kertas kasir berlatar putih dengan font monospasi sistem,
+/// garis putus-putus pemisah, rata kiri-kanan rapi, dan tombol Transaksi Baru menonjol.
 class ReceiptScreen extends StatelessWidget {
   final int transactionId;
 
@@ -20,8 +25,6 @@ class ReceiptScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return BlocProvider<ReceiptCubit>(
       create: (_) => sl<ReceiptCubit>()..loadReceipt(transactionId),
       child: PopScope(
@@ -40,31 +43,14 @@ class ReceiptScreen extends StatelessWidget {
           body: BlocBuilder<ReceiptCubit, ReceiptState>(
             builder: (context, state) {
               if (state is ReceiptLoading || state is ReceiptInitial) {
-                return const Center(child: CircularProgressIndicator());
+                return const LoadingView(message: 'Memuat data struk...');
               }
 
               if (state is ReceiptError) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 48,
-                          color: theme.colorScheme.error,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(state.message, textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: () => _returnToCashier(context),
-                          child: const Text('Kembali ke Kasir'),
-                        ),
-                      ],
-                    ),
-                  ),
+                return ErrorView(
+                  message: state.message,
+                  retryButtonText: 'Kembali ke Kasir',
+                  onRetry: () => _returnToCashier(context),
                 );
               }
 
@@ -72,33 +58,27 @@ class ReceiptScreen extends StatelessWidget {
 
               return SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
                   child: Column(
                     children: [
-                      // Kertas Struk
-                      _buildReceiptPaper(tx, theme),
+                      // Banner Sukses di atas struk (Tahap B)
+                      _buildSuccessBanner(),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: AppSpacing.md),
 
-                      // Tombol Transaksi Baru
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
+                      // Kertas Struk Fisik Monospaced (Tahap B)
+                      _buildReceiptPaper(tx),
+
+                      const SizedBox(height: AppSpacing.xl),
+
+                      // Tombol Transaksi Baru yang Menonjol (Tinggi 52 dp)
+                      PrimaryButton(
+                        height: 52,
+                        icon: Icons.add_shopping_cart_rounded,
+                        label: 'Mulai Transaksi Baru',
                         onPressed: () => _returnToCashier(context),
-                        icon: const Icon(Icons.add_shopping_cart),
-                        label: const Text(
-                          'Transaksi Baru',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                     ],
                   ),
                 ),
@@ -117,18 +97,56 @@ class ReceiptScreen extends StatelessWidget {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
-  Widget _buildReceiptPaper(TransactionEntity tx, ThemeData theme) {
+  Widget _buildSuccessBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.md,
+        horizontal: AppSpacing.lg,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: Colors.green.shade300, width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.check_circle_rounded,
+            color: Colors.green.shade700,
+            size: 22,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            'Transaksi Berhasil Disimpan',
+            style: TextStyle(
+              color: Colors.green.shade900,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptPaper(TransactionEntity tx) {
     final dateTime = DateTime.tryParse(tx.createdAt)?.toLocal();
     final formattedDate = dateTime != null
         ? DateFormat('dd/MM/yyyy HH:mm').format(dateTime)
         : tx.createdAt;
 
+    const monoStyle = TextStyle(
+      fontFamily: 'monospace',
+      color: Colors.black87,
+    );
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -137,7 +155,8 @@ class ReceiptScreen extends StatelessWidget {
           ),
         ],
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+          color: Colors.grey.shade300,
+          width: 1,
         ),
       ),
       child: Column(
@@ -147,11 +166,10 @@ class ReceiptScreen extends StatelessWidget {
           Center(
             child: Text(
               tx.storeName.toUpperCase(),
-              style: const TextStyle(
+              style: monoStyle.copyWith(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                color: Colors.black87,
+                letterSpacing: 1.5,
               ),
               textAlign: TextAlign.center,
             ),
@@ -161,7 +179,7 @@ class ReceiptScreen extends StatelessWidget {
             Center(
               child: Text(
                 tx.storeAddress!,
-                style: const TextStyle(
+                style: monoStyle.copyWith(
                   fontSize: 12,
                   color: Colors.black54,
                 ),
@@ -170,63 +188,76 @@ class ReceiptScreen extends StatelessWidget {
             ),
           ],
 
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _buildDashedDivider(),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
 
           // Metadata Transaksi
-          _buildMetaRow('No. Transaksi', '#${tx.id ?? "-"}'),
-          const SizedBox(height: 4),
-          _buildMetaRow('Kasir', tx.cashierName),
-          const SizedBox(height: 4),
-          _buildMetaRow('Waktu', formattedDate),
+          _buildMetaRow('No. Transaksi', '#${tx.id ?? "-"}', monoStyle),
+          const SizedBox(height: 3),
+          _buildMetaRow('Kasir', tx.cashierName, monoStyle),
+          const SizedBox(height: 3),
+          _buildMetaRow('Waktu', formattedDate, monoStyle),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           _buildDashedDivider(),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
 
           // Daftar Item & Add-on (B2 Snapshot)
-          ...tx.items.map((item) => _buildItemBlock(item)),
+          ...tx.items.map((item) => _buildItemBlock(item, monoStyle)),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           _buildDashedDivider(),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
 
           // Rincian Pembayaran
-          _buildSummaryRow('Subtotal', RupiahFormatter.format(tx.subtotal)),
+          _buildSummaryRow(
+            'Subtotal',
+            RupiahFormatter.format(tx.subtotal),
+            monoStyle,
+          ),
           if (tx.discountAmount > 0) ...[
             const SizedBox(height: 4),
             _buildSummaryRow(
               'Diskon (${tx.discountType == "percent" ? "${tx.discountValue}%" : "Nominal"})',
               '- ${RupiahFormatter.format(tx.discountAmount)}',
-              textColor: Colors.red.shade700,
+              monoStyle.copyWith(color: Colors.red.shade700),
             ),
           ],
           const SizedBox(height: 6),
           _buildSummaryRow(
             'TOTAL',
             RupiahFormatter.format(tx.total),
-            isBold: true,
-            fontSize: 16,
+            monoStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
           const SizedBox(height: 6),
-          _buildSummaryRow('Tunai', RupiahFormatter.format(tx.paid)),
+          _buildSummaryRow(
+            'Tunai',
+            RupiahFormatter.format(tx.paid),
+            monoStyle,
+          ),
           const SizedBox(height: 4),
           _buildSummaryRow(
             'Kembalian',
             RupiahFormatter.format(tx.changeAmount),
-            isBold: true,
+            monoStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           _buildDashedDivider(),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
 
           // Ucapan Penutup
-          const Center(
+          Center(
             child: Text(
               'Terima kasih atas kunjungan Anda!',
-              style: TextStyle(
+              style: monoStyle.copyWith(
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
                 color: Colors.black54,
@@ -238,9 +269,9 @@ class ReceiptScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildItemBlock(TransactionItemEntity item) {
+  Widget _buildItemBlock(TransactionItemEntity item, TextStyle monoStyle) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -251,31 +282,28 @@ class ReceiptScreen extends StatelessWidget {
               Expanded(
                 child: Text(
                   item.productName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
+                  style: monoStyle.copyWith(
+                    fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: Colors.black87,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               Text(
                 '${item.qty}x',
-                style: const TextStyle(
-                  fontSize: 13,
+                style: monoStyle.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  fontSize: 13,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               SizedBox(
-                width: 75,
+                width: 80,
                 child: Text(
                   RupiahFormatter.format(item.subtotal),
-                  style: const TextStyle(
+                  style: monoStyle.copyWith(
+                    fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
                   ),
                   textAlign: TextAlign.end,
                 ),
@@ -292,7 +320,7 @@ class ReceiptScreen extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '+ ${addon.addonName}',
-                      style: const TextStyle(
+                      style: monoStyle.copyWith(
                         fontSize: 11,
                         color: Colors.black54,
                       ),
@@ -300,17 +328,17 @@ class ReceiptScreen extends StatelessWidget {
                   ),
                   Text(
                     '${addon.qty}x ${RupiahFormatter.format(addon.unitPrice)}',
-                    style: const TextStyle(
+                    style: monoStyle.copyWith(
                       fontSize: 11,
                       color: Colors.black54,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   SizedBox(
-                    width: 75,
+                    width: 80,
                     child: Text(
                       RupiahFormatter.format(addon.subtotal),
-                      style: const TextStyle(
+                      style: monoStyle.copyWith(
                         fontSize: 11,
                         color: Colors.black54,
                       ),
@@ -326,52 +354,31 @@ class ReceiptScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMetaRow(String label, String value) {
+  Widget _buildMetaRow(String label, String value, TextStyle monoStyle) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.black54),
+          style: monoStyle.copyWith(fontSize: 12, color: Colors.black54),
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: monoStyle.copyWith(
             fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSummaryRow(
-    String label,
-    String value, {
-    bool isBold = false,
-    double fontSize = 13,
-    Color? textColor,
-  }) {
+  Widget _buildSummaryRow(String label, String value, TextStyle style) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: textColor ?? Colors.black87,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            color: textColor ?? Colors.black87,
-          ),
-        ),
+        Text(label, style: style),
+        Text(value, style: style),
       ],
     );
   }

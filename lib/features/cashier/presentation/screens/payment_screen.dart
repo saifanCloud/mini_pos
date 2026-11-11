@@ -39,6 +39,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
   int _paidAmount = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Pastikan state checkout bersih (tidak membawa nominal lama) saat layar dibuka.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<CheckoutCubit>().reset();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _discountController.dispose();
     _paidController.dispose();
@@ -112,7 +123,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
             );
 
             final changeAmount = _paidAmount - totals.total;
-            final isPaidSufficient = _paidAmount >= totals.total && totals.total > 0;
+            // Saat diskon 100% (totals.total == 0), pembayaran Rp0 tetap sah.
+            final isPaidSufficient = _paidAmount >= totals.total;
             final canConfirm = cart.isNotEmpty &&
                 isPaidSufficient &&
                 discountError == null &&
@@ -130,7 +142,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               buttonLabel = 'Keranjang Belanja Kosong';
             } else if (discountError != null) {
               buttonLabel = 'Periksa Kembali Diskon';
-            } else if (_paidAmount == 0) {
+            } else if (totals.total > 0 && _paidAmount == 0) {
               buttonLabel = 'Masukkan Uang Diterima';
             } else if (!isPaidSufficient) {
               buttonLabel = 'Uang Masih Kurang (${RupiahFormatter.format(totals.total - _paidAmount)})';
@@ -570,8 +582,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (success && context.mounted) {
       final txId = checkoutCubit.state.transactionId ?? 0;
 
-      // 1. Kosongkan keranjang belanja
+      // 1. Kosongkan keranjang belanja dan reset state checkout
       cartCubit.clearCart();
+      checkoutCubit.reset();
 
       // 2. Arahkan ke halaman Struk Digital (Tahap 12)
       Navigator.pushReplacement(

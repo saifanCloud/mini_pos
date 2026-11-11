@@ -193,6 +193,29 @@ void main() {
           contains('Stok produk Kopi Susu tidak mencukupi'));
     });
 
+    test('processPayment sukses saat total Rp0 (diskon 100%) dengan paid Rp0',
+        () async {
+      const totals = CheckoutTotals(
+        subtotal: 22000,
+        discountType: DiscountType.percent,
+        discountValue: 100,
+        discountAmount: 22000,
+        total: 0,
+      );
+
+      final success = await checkoutCubit.processPayment(
+        cart: testCart,
+        totals: totals,
+        changeAmount: 0,
+      );
+
+      expect(success, isTrue);
+      expect(checkoutCubit.state.status, CheckoutStatus.success);
+      expect(mockRepository.lastTotals?.total, 0);
+      expect(mockRepository.lastPaid, 0);
+      expect(mockRepository.lastChange, 0);
+    });
+
     test('reset mengembalikan state ke initial', () {
       checkoutCubit.setDiscount(DiscountType.percent, 10);
       checkoutCubit.setPaidAmount(50000);
